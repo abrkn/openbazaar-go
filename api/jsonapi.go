@@ -33,7 +33,6 @@ import (
 	"github.com/OpenBazaar/spvwallet"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	btc "github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
@@ -805,7 +804,7 @@ func (i *jsonAPIHandler) POSTSpendCoins(w http.ResponseWriter, r *http.Request) 
 	default:
 		feeLevel = spvwallet.NORMAL
 	}
-	addr, err := btc.DecodeAddress(snd.Address, i.node.Wallet.Params())
+	addr, err := i.node.Wallet.DecodeAddress(snd.Address)
 	if err != nil {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
@@ -1581,6 +1580,11 @@ func (i *jsonAPIHandler) GETOrder(w http.ResponseWriter, r *http.Request) {
 		tx := new(pb.TransactionRecord)
 		tx.Txid = r.Txid
 		tx.Value = r.Value
+		ts, err := ptypes.TimestampProto(r.Timestamp)
+		if err != nil {
+			continue
+		}
+		tx.Timestamp = ts
 		ch, err := chainhash.NewHashFromStr(tx.Txid)
 		if err != nil {
 			continue
