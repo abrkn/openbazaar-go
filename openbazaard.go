@@ -33,6 +33,7 @@ import (
 	"github.com/OpenBazaar/openbazaar-go/bitcoin/bitcoind"
 	"github.com/OpenBazaar/openbazaar-go/bitcoin/exchange"
 	lis "github.com/OpenBazaar/openbazaar-go/bitcoin/listeners"
+	"github.com/OpenBazaar/openbazaar-go/bitcoin/zcashd"
 	"github.com/OpenBazaar/openbazaar-go/core"
 	"github.com/OpenBazaar/openbazaar-go/ipfs"
 	obnet "github.com/OpenBazaar/openbazaar-go/net"
@@ -743,6 +744,15 @@ func (x *Start) Execute(args []string) error {
 			usetor = true
 		}
 		wallet = bitcoind.NewBitcoindWallet(mn, &params, repoPath, walletCfg.TrustedPeer, walletCfg.Binary, walletCfg.RPCUser, walletCfg.RPCPassword, usetor, controlPort)
+	case "zcashd":
+		if walletCfg.Binary == "" {
+			return errors.New("The path to the zcashd binary must be specified in the config file when using zcashd")
+		}
+		usetor := false
+		if usingTor && !usingClearnet {
+			usetor = true
+		}
+		wallet = zcashd.NewZcashdWallet(mn, &params, repoPath, walletCfg.TrustedPeer, walletCfg.Binary, walletCfg.RPCUser, walletCfg.RPCPassword, usetor, controlPort)
 	default:
 		log.Fatal("Unknown wallet type")
 	}
@@ -892,7 +902,7 @@ func (x *Start) Execute(args []string) error {
 			WL := lis.NewWalletListener(core.Node.Datastore, core.Node.Broadcast)
 			wallet.AddTransactionListener(TL.OnTransactionReceived)
 			wallet.AddTransactionListener(WL.OnTransactionReceived)
-			log.Info("Starting bitcoin wallet")
+			log.Info("Starting wallet")
 			su := bitcoin.NewStatusUpdater(wallet, core.Node.Broadcast, nd.Context())
 			go su.Start()
 			go wallet.Start()

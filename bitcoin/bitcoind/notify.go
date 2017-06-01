@@ -66,7 +66,7 @@ func (l *NotificationListener) notify(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func startNotificationListener(client *btcrpcclient.Client, listeners []func(spvwallet.TransactionCallback)) {
+func StartNotificationListener(client *btcrpcclient.Client, listeners []func(spvwallet.TransactionCallback)) {
 	l := NotificationListener{
 		client:    client,
 		listeners: listeners,
