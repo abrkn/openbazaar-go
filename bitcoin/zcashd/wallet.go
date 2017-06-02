@@ -158,7 +158,7 @@ func (w *ZcashdWallet) CurrentAddress(purpose spvwallet.KeyPurpose) btc.Address 
 	resp, _ := w.rpcClient.RawRequest("getaccountaddress", []json.RawMessage{json.RawMessage([]byte(`""`))})
 	var a string
 	json.Unmarshal(resp, &a)
-	addr, _ := NewZcashAddress(a, w.params)
+	addr, _ := DecodeAddress(a, w.params)
 	return addr
 }
 
@@ -166,8 +166,20 @@ func (w *ZcashdWallet) NewAddress(purpose spvwallet.KeyPurpose) btc.Address {
 	resp, _ := w.rpcClient.RawRequest("getnewaddress", []json.RawMessage{json.RawMessage([]byte(`""`))})
 	var a string
 	json.Unmarshal(resp, &a)
-	addr, _ := NewZcashAddress(a, w.params)
+	addr, _ := DecodeAddress(a, w.params)
 	return addr
+}
+
+func (w *ZcashdWallet) DecodeAddress(addr string) (btc.Address, error) {
+	return DecodeAddress(addr, w.params)
+}
+
+func (w *ZcashdWallet) ScriptToAddress(script []byte) (btc.Address, error) {
+	return ExtractPkScriptAddrs(script, w.params)
+}
+
+func (w *ZcashdWallet) AddressToScript(addr btc.Address) ([]byte, error) {
+	return PayToAddrScript(addr)
 }
 
 func (w *ZcashdWallet) HasKey(addr btc.Address) bool {
@@ -287,7 +299,7 @@ func (w *ZcashdWallet) BumpFee(txid chainhash.Hash) (*chainhash.Hash, error) {
 				Value:        int64(u.Amount / 100000000),
 				ScriptPubkey: script,
 			}
-			addr, err := btc.DecodeAddress(u.Address, w.params)
+			addr, err := DecodeAddress(u.Address, w.params)
 			if err != nil {
 				continue
 			}
@@ -573,7 +585,7 @@ func (w *ZcashdWallet) GenerateMultisigScript(keys []hd.ExtendedKey, threshold i
 	if err != nil {
 		return nil, nil, err
 	}
-	addr, err = btc.NewAddressScriptHash(redeemScript, w.params)
+	addr, err = NewAddressScriptHash(redeemScript, w.params)
 	if err != nil {
 		return nil, nil, err
 	}
