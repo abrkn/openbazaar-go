@@ -245,7 +245,6 @@ func (n *OpenBazaarNode) ValidateOrderConfirmation(contract *pb.RicardianContrac
 		return errors.New("Vendor's response contained invalid order ID")
 	}
 	if contract.VendorOrderConfirmation.RequestedAmount != contract.BuyerOrder.Payment.Amount {
-		log.Notice(contract.VendorOrderConfirmation.RequestedAmount, contract.BuyerOrder.Payment.Amount)
 		return errors.New("Vendor requested an amount different from what we calculated")
 	}
 	if contract.BuyerOrder.Payment.Method == pb.Order_Payment_MODERATED {
