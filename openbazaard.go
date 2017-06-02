@@ -668,6 +668,7 @@ func (x *Start) Execute(args []string) error {
 	proto.Unmarshal(dhtrec.GetValue(), e)
 
 	// Wallet
+	var exchangeRates bitcoin.ExchangeRates
 	mn, err := sqliteDB.Config().GetMnemonic()
 	if err != nil {
 		log.Error(err)
@@ -735,6 +736,9 @@ func (x *Start) Execute(args []string) error {
 			log.Error(err)
 			return err
 		}
+		if !x.DisableExchangeRates {
+			exchangeRates = exchange.NewBitcoinPriceFetcher(torDialer)
+		}
 	case "bitcoind":
 		if walletCfg.Binary == "" {
 			return errors.New("The path to the bitcoind binary must be specified in the config file when using bitcoind")
@@ -744,6 +748,9 @@ func (x *Start) Execute(args []string) error {
 			usetor = true
 		}
 		wallet = bitcoind.NewBitcoindWallet(mn, &params, repoPath, walletCfg.TrustedPeer, walletCfg.Binary, walletCfg.RPCUser, walletCfg.RPCPassword, usetor, controlPort)
+		if !x.DisableExchangeRates {
+			exchangeRates = exchange.NewBitcoinPriceFetcher(torDialer)
+		}
 	case "zcashd":
 		if walletCfg.Binary == "" {
 			return errors.New("The path to the zcashd binary must be specified in the config file when using zcashd")
@@ -753,6 +760,9 @@ func (x *Start) Execute(args []string) error {
 			usetor = true
 		}
 		wallet = zcashd.NewZcashdWallet(mn, &params, repoPath, walletCfg.TrustedPeer, walletCfg.Binary, walletCfg.RPCUser, walletCfg.RPCPassword, usetor, controlPort)
+		if !x.DisableExchangeRates {
+			exchangeRates = zcashd.NewZcashPriceFetcher(torDialer)
+		}
 	default:
 		log.Fatal("Unknown wallet type")
 	}
@@ -833,11 +843,6 @@ func (x *Start) Execute(args []string) error {
 	if err != nil {
 		log.Error(err)
 		return err
-	}
-
-	var exchangeRates bitcoin.ExchangeRates
-	if !x.DisableExchangeRates {
-		exchangeRates = exchange.NewBitcoinPriceFetcher(torDialer)
 	}
 
 	// Set up the ban manager
