@@ -1589,10 +1589,11 @@ func (i *jsonAPIHandler) GETOrder(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			continue
 		}
-		confirmations, err := i.node.Wallet.GetConfirmations(*ch)
+		confirmations, height, err := i.node.Wallet.GetConfirmations(*ch)
 		if err != nil {
 			continue
 		}
+		tx.Height = height
 		tx.Confirmations = confirmations
 		txs = append(txs, tx)
 	}
@@ -1853,11 +1854,12 @@ func (i *jsonAPIHandler) POSTOrderFulfill(w http.ResponseWriter, r *http.Request
 }
 
 func (i *jsonAPIHandler) POSTOrderComplete(w http.ResponseWriter, r *http.Request) {
-	checkRatingValue := func(val int) {
+	checkRatingValue := func(val int) bool {
 		if val < core.RatingMin || val > core.RatingMax {
 			ErrorResponse(w, http.StatusBadRequest, "rating values must be between 1 and 5")
-			return
+			return false
 		}
+		return true
 	}
 	decoder := json.NewDecoder(r.Body)
 	var or core.OrderRatings
@@ -1876,11 +1878,21 @@ func (i *jsonAPIHandler) POSTOrderComplete(w http.ResponseWriter, r *http.Reques
 			ErrorResponse(w, http.StatusBadRequest, "rating must contain the slug")
 			return
 		}
-		checkRatingValue(rd.Overall)
-		checkRatingValue(rd.Quality)
-		checkRatingValue(rd.Description)
-		checkRatingValue(rd.DeliverySpeed)
-		checkRatingValue(rd.CustomerService)
+		if !checkRatingValue(rd.Overall) {
+			return
+		}
+		if !checkRatingValue(rd.Quality) {
+			return
+		}
+		if !checkRatingValue(rd.Description) {
+			return
+		}
+		if !checkRatingValue(rd.DeliverySpeed) {
+			return
+		}
+		if !checkRatingValue(rd.CustomerService) {
+			return
+		}
 		if len(rd.Review) > core.ReviewMaxCharacters {
 			ErrorResponse(w, http.StatusBadRequest, "too many characters in review")
 			return
@@ -3079,8 +3091,9 @@ func (i *jsonAPIHandler) GETRating(w http.ResponseWriter, r *http.Request) {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	if !core.ValidateRating(rating) {
-		ErrorResponse(w, http.StatusExpectationFailed, "Bad/forged rating")
+	valid, err := core.ValidateRating(rating)
+	if !valid || err != nil {
+		ErrorResponse(w, http.StatusExpectationFailed, err.Error())
 		return
 	}
 	ret, err := json.MarshalIndent(rating, "", "    ")
@@ -3092,12 +3105,8 @@ func (i *jsonAPIHandler) GETRating(w http.ResponseWriter, r *http.Request) {
 }
 
 func (i *jsonAPIHandler) POSTFetchRatings(w http.ResponseWriter, r *http.Request) {
-	type ratingPost struct {
-		Ids []string `json:"ids"`
-	}
-
 	decoder := json.NewDecoder(r.Body)
-	var rp ratingPost
+	var rp []string
 	err := decoder.Decode(&rp)
 	if err != nil {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
@@ -3110,7 +3119,7 @@ func (i *jsonAPIHandler) POSTFetchRatings(w http.ResponseWriter, r *http.Request
 	if !async {
 		var wg sync.WaitGroup
 		var ret []string
-		for _, id := range rp.Ids {
+		for _, id := range rp {
 			wg.Add(1)
 			go func(rid string) {
 				ratingBytes, err := ipfs.Cat(i.node.Context, rid)
@@ -3122,7 +3131,8 @@ func (i *jsonAPIHandler) POSTFetchRatings(w http.ResponseWriter, r *http.Request
 				if err != nil {
 					return
 				}
-				if !core.ValidateRating(rating) {
+				valid, err := core.ValidateRating(rating)
+				if !valid || err != nil {
 					return
 				}
 				m := jsonpb.Marshaler{
@@ -3170,7 +3180,7 @@ func (i *jsonAPIHandler) POSTFetchRatings(w http.ResponseWriter, r *http.Request
 		respJson, _ := json.MarshalIndent(response, "", "    ")
 		w.WriteHeader(http.StatusAccepted)
 		SanitizedResponse(w, string(respJson))
-		for _, r := range rp.Ids {
+		for _, r := range rp {
 			go func(rid string) {
 				type ratingError struct {
 					ID       string `json:"id"`
@@ -3198,8 +3208,9 @@ func (i *jsonAPIHandler) POSTFetchRatings(w http.ResponseWriter, r *http.Request
 					respondWithError("Invalid rating")
 					return
 				}
-				if !core.ValidateRating(rating) {
-					respondWithError("Rating is forged and/or corrupt")
+				valid, err := core.ValidateRating(rating)
+				if !valid || err != nil {
+					respondWithError(err.Error())
 					return
 				}
 				resp := new(pb.RatingWithID)

@@ -369,6 +369,8 @@ func (n *OpenBazaarNode) ValidateAndSaveRating(contract *pb.RicardianContract) e
 		}
 		defer f.Close()
 
+		go ipfs.AddFile(n.Context, ratingPath)
+
 		_, werr := f.Write([]byte(ratingJson))
 		if werr != nil {
 			return werr
@@ -422,13 +424,13 @@ func (n *OpenBazaarNode) updateRatingIndex(rating *pb.Rating, ratingPath string)
 
 	// Check to see if the rating we are adding already exists in the list. If so update it.
 	exists := false
-	for _, d := range index {
+	for i, d := range index {
 		if rating.RatingData.VendorSig.Metadata.ListingSlug == d.Slug {
-			d.Ratings = append(d.Ratings, ratingHash)
-			total := d.Average * float32(d.Count)
+			index[i].Ratings = append(index[i].Ratings, ratingHash)
+			total := index[i].Average * float32(index[i].Count)
 			total += float32(rating.RatingData.Overall)
-			d.Count += 1
-			d.Average = total / float32(d.Count)
+			index[i].Count += 1
+			index[i].Average = total / float32(index[i].Count)
 			exists = true
 			break
 		}
