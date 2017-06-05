@@ -246,13 +246,13 @@ func (w *ZcashdWallet) GetTransaction(txid chainhash.Hash) (spvwallet.Txn, error
 	return t, nil
 }
 
-func (w *ZcashdWallet) GetConfirmations(txid chainhash.Hash) (uint32, error) {
+func (w *ZcashdWallet) GetConfirmations(txid chainhash.Hash) (uint32, uint32, error) {
 	includeWatchOnly := true
 	resp, err := w.rpcClient.GetTransaction(&txid, &includeWatchOnly)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	return uint32(resp.Confirmations), nil
+	return uint32(resp.Confirmations), uint32(resp.BlockIndex), nil
 }
 
 func (w *ZcashdWallet) ChainTip() uint32 {
